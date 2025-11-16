@@ -1,95 +1,162 @@
-# Yard Planning
+---
+
+# Yard Planning System
+
+Sistem sederhana untuk mengatur posisi container pada yard dengan logika slot–row–tier. Project ini menyediakan endpoint untuk **suggestion**, **placement**, dan **pickup** container.
+
+---
+
+## 📁 Struktur Project
+
+```
 yard-planning/
-├── main.go         # entry point, start server & route handler
-├── db.go           # koneksi database
-├── model.go        # struct model untuk table: Yard, Block, YardPlan
-├── suggestion.go   # endpoint /suggestion (cari posisi kosong)
-└── placement.go    # endpoint /placement untuk menempatkan container
-└── pickup.go    # endpoint /pickup untuk pickup container
+├── main.go          # Entry point: start server & route handler
+├── db.go            # Koneksi database
+├── model.go         # Struct model: Yard, Block, YardPlan
+├── suggestion.go    # Endpoint /suggestion untuk mencari posisi kosong
+├── placement.go     # Endpoint /placement untuk menempatkan container
+└── pickup.go        # Endpoint /pickup untuk pickup container
+```
 
-## Tabel
-yards - untuk menampung data yards
-blocks - untuk menampung data blok (terhubung ke yards by yard_id)
-yard_planning - untuk menampung posisi container, slot, row, tier dll
+---
 
-## Suggestion
+## 🗄 Struktur Database
 
-curl -X POST "http://localhost:8080/suggestion"
+### Tabel:
 
-Contoh Body :
-{
-	"yard":  "YRD1",
-	"container_number":  "ALFI000002",
-	"container_size":  20,
-	"container_height":  8.6,
-	"container_type":  "DRY"
-}
+* **yards**
+  Menyimpan data yard.
 
-Contoh Response :
-{
-	"suggested_position":  {
-		"block":  "LC01",
-		"row":  1,
-		"slot":  1,
-		"tier":  1
-	}
-}
+* **blocks**
+  Menyimpan data blok (relasi melalui `yard_id`).
 
-Alur :
+* **yard_planning**
+  Menyimpan lokasi container: slot, row, tier, container info, dan status pickup.
+
+---
+
+# 🔍 Suggestion Endpoint
+
+### **POST** `/suggestion`
+
+Digunakan untuk mencari posisi kosong pada yard berdasarkan urutan:
+
 1. Saya menggunakan Pendekatan Agar Semua Slot Terisi semua terlebih dahulu Ascending dimulai dari 1. Misal Slot 1, Row 1, Tier 1
 2. Jika slot terisi semua, lalu lanjut ke Row, sama Mulai dr 1 dan seterusnya Jadi misal Slot terakhir, Row 1 terisi semua lalu ke Row 2
 3. Lalu jika semua Slots terisi lalu row terisi semua juga maka Tier naik ke 2 dan seterusnya
 
-## Placement
+### Contoh Request
 
-curl -X POST "http://localhost:8080/placement"
-
-Contoh Body :
+```json
 {
-	"yard":  "YRD1",
-	"container_number":  "ALFI000004",
-	"block":  "LC01",
-	"slot":  3,
-	"row":  2,
-	"tier":  1,
-	"container_size":  20
+  "yard": "YRD1",
+  "container_number": "ALFI000002",
+  "container_size": 20,
+  "container_height": 8.6,
+  "container_type": "DRY"
 }
+```
 
-Response :
+### Contoh Response
+
+```json
 {
-	"message":  "container placed successfully"
+  "suggested_position": {
+    "block": "LC01",
+    "row": 1,
+    "slot": 1,
+    "tier": 1
+  }
 }
+```
 
-Alur :
+---
+
+# 📦 Placement Endpoint
+
+### **POST** `/placement`
+
+Digunakan untuk menempatkan container pada posisi tertentu.
+
+### Contoh Request
+
+```json
+{
+  "yard": "YRD1",
+  "container_number": "ALFI000004",
+  "block": "LC01",
+  "slot": 3,
+  "row": 2,
+  "tier": 1,
+  "container_size": 20
+}
+```
+
+### Contoh Response
+
+```json
+{
+  "message": "container placed successfully"
+}
+```
+
+### Alur Logika
+
 1. Akan Melakukan Pengecekan ke Table yard_plans sudah terisi belum
 2. Jika Kosong maka langsung ter insert
 3. Jika Terisi maka akan ter validasi
 
-NOTE : saya menambahkan container_size di req body, karena ada case jika container berukuran 40ft maka butuh 2 slot.
+> NOTE : saya menambahkan container_size di req body, karena ada case jika container berukuran 40ft maka butuh 2 slot.
 
-## Pickup
+---
 
-curl -X POST "http://localhost:8080/pickup"
+# 🚚 Pickup Endpoint
 
-Contoh Body :
+### **POST** `/pickup`
+
+Digunakan untuk menandai bahwa container sudah diambil.
+
+### Contoh Request
+
+```json
 {
-	"yard":  "YRD1",
-	"container_number":  "ALFI000002"
+  "yard": "YRD1",
+  "container_number": "ALFI000002"
 }
+```
 
-Response :
+### Contoh Response
+
+```json
 {
-	"message":  "container picked up successfully"
+  "message": "container picked up successfully"
 }
+```
 
-Alur :
-1. jika di pickup di yard_plans ada kolom is_picked, true berarti sudah di pickup, jika false maka belum di pickup dan status masih ditempati container
+### Logika
 
-NOTE : Jika bisa mengubah req body mungkin saya akan memilih memasukkan yard_id daripada menggunakan nama yard/code. agar lebih unique.
+* Kolom `is_picked` menentukan status container.
+* `true` → container sudah diambil
+* `false` → container masih terpasang
 
-# Instalasi
-1. Clone repository
-2. Import database
-3. Masuk ke db.go setting untuk konfigurasi database bisa di sesuaikan
-4. jalankan via terminal di folder utama (yard-planning) run "go run ."
-5. jalankan sesuai endpoint yang ingin diuji via postman atau lainnya
+> Catatan: Jika boleh mungkin Lebih baik menggunakan **yard_id** agar lebih unik daripada memakai `yard` code/name.
+
+---
+
+# 🛠 Instalasi & Menjalankan Server
+
+1. Clone repository:
+
+   ```bash
+   git clone https://github.com/denizsetyawan/yard-planning-test.git
+   ```
+2. Import database dari file SQL.
+3. Edit konfigurasi database di `db.go`.
+4. Jalankan server:
+
+   ```bash
+   go run .
+   ```
+5. Uji endpoint menggunakan Postman / Thunder Client / cURL.
+
+---
